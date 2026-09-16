@@ -73,13 +73,15 @@ const LANGUAGE_EXTENSIONS = {
 const tbody = document.getElementById("commit-list");
 const commitTemplate = document.getElementById("commit-list-template");
 
+var focusedCommit = ''
 var commitItems = new Array();
 
 class Commit {
-  constructor(sha, title, date, linesAdded, linesDeleted, filesChanged, languageBreakdown, actionsStatus, committerIconUrl, committerName, commitUrl) {
+  constructor(sha, title, date, time, linesAdded, linesDeleted, filesChanged, languageBreakdown, actionsStatus, committerIconUrl, committerName, commitUrl) {
     this.sha = sha;
     this.title = title;
     this.date = date;
+    this.time = time;
     this.linesAdded = linesAdded;
     this.linesDeleted = linesDeleted;
     this.filesChanged = filesChanged;
@@ -307,6 +309,12 @@ function formatDate(dateString) {
   return date.toLocaleDateString(undefined, options);
 }
 
+function formatTime(dateString) {
+  const date = new Date(dateString);
+  const options = { hour: 'numeric', minute: 'numeric' };
+  return date.toLocaleDateString(undefined, options);
+}
+
 function fileToLang(files) {
   const langMap = {};
 
@@ -376,6 +384,7 @@ async function getCommits() {
       commitData["sha"],
       commitData["commit"]["message"],
       formatDate(commitData["commit"]["author"]["date"]),
+      formatTime(commitData["commit"]["author"]["date"]),
       commitData["stats"]["additions"],
       commitData["stats"]["deletions"],
       files.length,
@@ -397,8 +406,8 @@ function sortCommits() {
   drawAllCommits();
 }
 
-function createCommit(sha, title, date, linesAdded, linesDeleted, filesChanged, languageBreakdown, actionsStatus, committerIconUrl, committerName, commitUrl) {
-  const commit = new Commit(sha, title, date, linesAdded, linesDeleted, filesChanged, languageBreakdown, actionsStatus, committerIconUrl, committerName, commitUrl);
+function createCommit(sha, title, date, time, linesAdded, linesDeleted, filesChanged, languageBreakdown, actionsStatus, committerIconUrl, committerName, commitUrl) {
+  const commit = new Commit(sha, title, date, time, linesAdded, linesDeleted, filesChanged, languageBreakdown, actionsStatus, committerIconUrl, committerName, commitUrl);
   commitItems.push(commit);
   return commit;
 }
@@ -482,6 +491,7 @@ async function renderFocusedCommitWorkflows(commit, clone) {
 
 async function renderFocusedCommit(commit) {
   focusedCommitContainer.innerHTML = '';
+  focusedCommit = commit.sha;
   const clone = document.importNode(focusedCommitTemplate.content, true);
 
   const chartEl = clone.querySelector(".focused-commit-pi-chart");
@@ -510,6 +520,47 @@ async function renderFocusedCommit(commit) {
 
 async function selectCommit(commit) {
   await renderFocusedCommit(commit);
+}
+
+async function newCommitExists() {
+  const [owner, repo] = getRepoInfo();
+  const commits = await api.getCommits(owner, repo);
+  commits.sort((a, b) => new Date(b.commit.author.date) - new Date(a.commit.author.date));
+
+  const latestDate = new Date(Math.max(...commitItems.map(c => new Date(c.date))));
+
+  // For commits made after the latest commit in commitItems, create a new
+  // Commit item and draw it.
+  for (const commit_obj of commits) {
+    const sha = commit_obj["sha"];
+    if (commitItems.some(c => c.sha === sha)) continue;
+
+    const commitDate = new Date(commit_obj["commit"]["author"]["date"]);
+    if (commitDate <= latestDate) break;
+
+    const commitData = await api.getCommit(owner, repo, sha);
+    const files = commitData["files"] || [];
+    const actionsStatus = await getCiStatusForCommit(owner, repo, sha);
+
+    const commit = createCommit(
+      commitData["sha"],
+      commitData["commit"]["message"],
+      formatDate(commitData["commit"]["author"]["date"]),
+      formatTime(commitData["commit"]["author"]["date"]),
+      commitData["stats"]["additions"],
+      commitData["stats"]["deletions"],
+      files.length,
+      fileToLang(files),
+      actionsStatus,
+      commitData["author"]["avatar_url"],
+      commitData["commit"]["author"]["name"],
+      commitData["commit"]["url"]
+    );
+
+    addCommit(commit.sha, commit.title, commit.date, commit.linesAdded, commit.linesDeleted, commit.filesChanged, commit.languageBreakdown, commit.actionsStatus, commit.committerIconUrl, commit.usableUrl());
+  }
+
+  sortCommits();
 }
 
 Array.from(document.getElementsByClassName("commit")).forEach(element => {
@@ -564,3 +615,16 @@ document.addEventListener("DOMContentLoaded", function () {
     githubKey.value = savedKey;
   }
 });
+
+function updatePage() {
+  newCommitExists();
+  if (focusedCommit != "") {
+    renderFocusedCommit(getCommitBySha(focusedCommit));
+  }
+}
+
+window.onload = function () {
+  updatePage();
+
+  setInterval(updatePage, 300000);
+};

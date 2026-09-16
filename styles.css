@@ -217,17 +217,18 @@ body {
     align-items: center;
     background-color: var(--secondary);
     border-bottom: var(--border) 2px solid;
-    font-weight: 500;
+    font-weight: 800;
     gap: 1rem;
     padding: 0.25rem;
     transition: all 0.1s ease-in;
     cursor: pointer;
+    font-family: monospace;
 }
 
 .commit-focused-workflow-status:hover {
     scale: 1.01;
     background-color: var(--tertiary);
-    font-weight: 800;
+    font-weight: 1000;
 }
 
 .commit-focused-workflow-status__indicator {
