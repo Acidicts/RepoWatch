@@ -508,6 +508,7 @@ async function renderFocusedCommit(commit) {
   clone.querySelector(".focused-commit-text").textContent = GFG(commit.title, 30, "...");
   clone.querySelector(".focused-committer-image").src = commit.committerIconUrl;
   clone.querySelector(".focused-commit-meta-sha").textContent = GFG(commit.sha, 7, "");
+  clone.querySelector(".focused-commit-meta-sha").href = commit.usableUrl();
   clone.querySelector(".focused-commit-meta-date").textContent = commit.date;
   clone.querySelector(".focused-commiter-name").textContent = commit.committerName;
   clone.querySelector(".focused-commit-changes-added").textContent = commit.linesAdded;
