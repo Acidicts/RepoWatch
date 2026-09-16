@@ -505,7 +505,7 @@ async function renderFocusedCommit(commit) {
   chartEl.appendChild(tooltip);
   buildHitLayer(svg, segments, total, tooltip);
 
-  clone.querySelector(".focused-commit-text").textContent = GFG(commit.title, 30, "...");
+  clone.querySelector(".focused-commit-text").textContent = commit.title;
   clone.querySelector(".focused-committer-image").src = commit.committerIconUrl;
   clone.querySelector(".focused-commit-meta-sha").textContent = GFG(commit.sha, 7, "");
   clone.querySelector(".focused-commit-meta-sha").href = commit.usableUrl();
