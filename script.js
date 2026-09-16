@@ -581,6 +581,8 @@ document.getElementById("repo-input-button").addEventListener("click", async () 
   } catch (error) {
     // console.error("Error fetching commits:", error);
     alert("Error fetching commits. Please check the repository and your GitHub key.");
+    const settingsModal = document.getElementById("settings-modal");
+    settingsModal.showModal();
   }
 });
 
@@ -599,6 +601,14 @@ document.getElementById("save-settings").addEventListener("click", async () => {
 document.getElementById("settings-button").addEventListener('click', () => {
   const settingsModal = document.getElementById("settings-modal");
   settingsModal.showModal();
+});
+
+document.getElementById("toggle-guide").addEventListener('click', () => {
+  const guide = document.getElementById("pat-guide");
+  const btn = document.getElementById("toggle-guide");
+  const isHidden = guide.hidden;
+  guide.hidden = !isHidden;
+  btn.textContent = isHidden ? "Hide guide" : "Need a token? How to get one";
 });
 
 document.addEventListener("DOMContentLoaded", function () {

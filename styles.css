@@ -29,16 +29,122 @@
 
 /* Settings Modal */
 dialog {
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    padding: 24px;
+    border: none;
+    border-radius: 12px;
+    padding: 28px;
     max-width: 400px;
     width: 90%;
+    background: var(--bg);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
 }
 
 dialog::backdrop {
-    background-color: rgba(0, 0, 0, 0.6);
+    background-color: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(4px);
+}
+
+dialog h2 {
+    margin: 0 0 18px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+dialog input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--page-bg);
+    font-size: 13px;
+    color: var(--ink);
+    font-family: inherit;
+    margin-bottom: 16px;
+}
+
+dialog input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+dialog input::placeholder {
+    color: var(--grey);
+}
+
+dialog #save-settings {
+    width: 100%;
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 8px 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.btn-link:hover {
+    color: var(--ink);
+}
+
+.pat-guide {
+    margin-top: 12px;
+    background: var(--page-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+}
+
+.pat-guide-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pat-guide-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink);
+}
+
+.pat-guide-step-num {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    background: var(--primary);
+    color: var(--bg);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.pat-guide-step a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.pat-guide-step a:hover {
+    color: var(--ink);
+}
+
+.pat-guide-step code {
+    background: var(--bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+    border: 1px solid var(--border);
 }
 
 /* Body */

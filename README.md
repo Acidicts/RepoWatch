@@ -2,7 +2,7 @@
 
 Well it's quite simple in my opinion:
 - You give it OWNER/REPO for a public github repo
-- Optionally give it a Github Personal Access Token (PAT)
+- It needs a Github Personal Access Token (PAT) to increase rate-limit and won't run without one due to doing api key checks on change to it
 - It gives you info
 
 ## Getting a PAT

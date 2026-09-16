@@ -87,8 +87,38 @@
 
     <dialog id="settings-modal">
         <h2>Settings</h2>
+        <label>GitHub Personal Access Token <strong>:</strong></label>
         <input type="text" id="github_key" placeholder="GitHub Personal Access Token" />
         <button id="save-settings" class="btn-primary">Save</button>
+        <button id="toggle-guide" class="btn-link">Need a token? How to get one</button>
+        <div id="pat-guide" class="pat-guide" hidden>
+            <div class="pat-guide-steps">
+                <div class="pat-guide-step">
+                    <span class="pat-guide-step-num">1</span>
+                    <span>Go to <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">GitHub Settings &rarr; Developer settings &rarr; Personal access tokens</a></span>
+                </div>
+                <div class="pat-guide-step">
+                    <span class="pat-guide-step-num">2</span>
+                    <span>Click <strong>Generate new token</strong> (fine-grained)</span>
+                </div>
+                <div class="pat-guide-step">
+                    <span class="pat-guide-step-num">3</span>
+                    <span>Give it a name (e.g. "Repo Watch")</span>
+                </div>
+                <div class="pat-guide-step">
+                    <span class="pat-guide-step-num">4</span>
+                    <span>Select for scope: <code>repo</code> (all (public + your private ones) repositories or just public)</span>
+                </div>
+                <div class="pat-guide-step">
+                    <span class="pat-guide-step-num">5</span>
+                    <span>Click <strong>Generate token</strong> and copy it</span>
+                </div>
+                <div class="pat-guide-step">
+                    <span class="pat-guide-step-num">6</span>
+                    <span><strong>Write it down</strong> so you don't lose it like me and have to have it in the .env in development</span>
+                </div>
+            </div>
+        </div>
     </dialog>
 
     <header class="header topbar">
