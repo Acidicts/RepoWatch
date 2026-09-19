@@ -85,9 +85,18 @@
     </template>
 
     <dialog id="settings-modal">
-        <h2>Settings</h2>
-        <label>GitHub Personal Access Token <strong>:</strong></label>
-        <input type="text" id="github_key" placeholder="GitHub Personal Access Token" />
+        <div class="settings-modal-heading">
+            <h2>Settings</h2>
+            <svg class="settings-modal-close-button" fill="#000000" viewBox="0 0 32 32"
+                xmlns="http://www.w3.org/2000/svg">
+                <path
+                    d="M18.8,16l5.5-5.5c0.8-0.8,0.8-2,0-2.8l0,0C24,7.3,23.5,7,23,7c-0.5,0-1,0.2-1.4,0.6L16,13.2l-5.5-5.5  c-0.8-0.8-2.1-0.8-2.8,0C7.3,8,7,8.5,7,9.1s0.2,1,0.6,1.4l5.5,5.5l-5.5,5.5C7.3,21.9,7,22.4,7,23c0,0.5,0.2,1,0.6,1.4  C8,24.8,8.5,25,9,25c0.5,0,1-0.2,1.4-0.6l5.5-5.5l5.5,5.5c0.8,0.8,2.1,0.8,2.8,0c0.8-0.8,0.8-2.1,0-2.8L18.8,16z" />
+            </svg>
+        </div>
+        <label>GitHub Personal Access Token <strong>(optional):</strong></label>
+        <input type="text" id="github_key" placeholder="GitHub Personal Access Token (leave empty for 60 req/hr)" />
+        <p class="settings-hint">Optional — without a token you get 60 requests/hour; with a token up to 5,000/hour.
+            Leave empty and Save to use unauthenticated mode.</p>
         <button id="save-settings" class="btn-primary">Save</button>
         <button id="toggle-guide" class="btn-link">Need a token? How to get one</button>
         <div id="pat-guide" class="pat-guide" hidden>
@@ -117,8 +126,8 @@
                 </div>
                 <div class="pat-guide-step">
                     <span class="pat-guide-step-num">6</span>
-                    <span><strong>Write it down</strong> so you don't lose it like me and have to have it in the .env in
-                        development</span>
+                    <span><strong>Copy it</strong> into the settings box above and click Save. Leave the box empty to
+                        use the app without a token (60 requests/hour).</span>
                 </div>
             </div>
         </div>

@@ -28,6 +28,23 @@
 }
 
 /* Settings Modal */
+.settings-modal-heading {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;     
+}
+
+.settings-modal-close-button {
+    width: 32px;
+    height: 32px;
+    transition: all 0.1s ease-in;
+}
+
+.settings-modal-close-button:hover{
+    scale: 1.05;
+    fill: var(--primary);
+}
+
 dialog {
     border: none;
     border-radius: 12px;

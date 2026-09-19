@@ -98,10 +98,21 @@ class Commit {
   }
 
   async getActionsStatus() {
-    const [owner, repo] = getRepoInfo()
-    const ciData = await api.getCIStatus(owner, repo, this.sha)
+    let ciData;
+    try {
+      const [owner, repo] = getRepoInfo()
+      if (!owner || !repo) return;
+      ciData = await api.getCIStatus(owner, repo, this.sha)
+    } catch (err) {
+      // Rate limits propagate so the UI can warn; missing CI just leaves
+      // the per-check list empty instead of breaking the focused view.
+      if (err && err.isRateLimit) throw err;
+      console.warn(`Could not load check-runs for ${this.sha}:`, err);
+      return;
+    }
+    if (!ciData) return;
 
-    for (const checkRun of ciData["check_runs"]) {
+    for (const checkRun of ciData["check_runs"] || []) {
       let complete = true;
       let failed = false;
       if (["queued", "in_progress", "waiting", "requested", "pending"].includes(checkRun["status"])) {
@@ -318,8 +329,42 @@ function addCommit(sha, title, date, linesAdded, linesDeleted, filesChanged, lan
 }
 
 function getRepoInfo() {
-  const repo_input = document.getElementById("repo_input").value;
-  return repo_input.split("/");
+  const el = document.getElementById("repo_input");
+  const raw = (el ? el.value : "").trim().replace(/\/+$/, "");
+  if (!raw) return [null, null];
+  // Accept a pasted GitHub URL as well as "owner/repo".
+  const urlMatch = raw.match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/.*)?$/i);
+  if (urlMatch) return [urlMatch[1], urlMatch[2]];
+  const parts = raw.split("/");
+  if (parts.length !== 2 || !parts[0].trim() || !parts[1].trim()) {
+    return [null, null];
+  }
+  return [parts[0].trim(), parts[1].trim()];
+}
+
+// User-facing message for GitHub API failures. Distinguishes the three
+// common 403 causes: quota exhausted, bad/missing token scope, and
+// forbidden repo access.
+function formatApiError(error, repoLabel) {
+  if (error && error.isRateLimit) {
+    const reset = error.rateReset ? new Date(Number(error.rateReset) * 1000).toLocaleTimeString() : null;
+    return `GitHub API rate limit exceeded${reset ? ` (resets ${reset})` : ""}. ` +
+      `Without a token you get 60 requests/hour — one full load costs ~21 requests. ` +
+      `Add a personal access token in Settings to get 5,000/hour, then try again.`;
+  }
+  if (error && (error.status === 401 || error.status === 403)) {
+    if (hasGithubKey()) {
+      return `GitHub refused the request (${error.status}) for "${repoLabel}". ` +
+        `Your token may be expired or missing access to this repo. Check the token in Settings and try again.`;
+    }
+    return `GitHub refused the request (${error.status}) for "${repoLabel}". ` +
+      `The repo may be private (needs a token) or the unauthenticated quota is exhausted. ` +
+      `Add a token in Settings and try again.`;
+  }
+  if (error && error.status === 404) {
+    return `Repository "${repoLabel}" was not found. Check the owner/repo spelling.`;
+  }
+  return `Error fetching commits for "${repoLabel}". ${error && error.message ? error.message : error}`;
 }
 
 function formatDate(dateString) {
@@ -331,7 +376,7 @@ function formatDate(dateString) {
 function formatTime(dateString) {
   const date = new Date(dateString);
   const options = { hour: 'numeric', minute: 'numeric' };
-  return date.toLocaleDateString(undefined, options);
+  return date.toLocaleTimeString(undefined, options);
 }
 
 function fileToLang(files) {
@@ -368,14 +413,26 @@ function langMapToLangBreakdown(langMap) {
   return breakdown;
 }
 
-// Computes the traffic-light status ("red" | "yellow" | "green") for a single
-// commit's CI checks. Shared by getCommits (initial load) and updateAllCommits
-// (periodic refresh of still-pending commits).
+// Computes the traffic-light status ("red" | "yellow" | "green" | "gray") for
+// a single commit's CI checks. Shared by getCommits (initial load) and
+// updateAllCommits (periodic refresh of still-pending commits).
+// "gray" = CI unavailable (repo has no checks, or a non-quota 403/404).
+// Rate-limit errors rethrow so the caller can stop and warn instead of
+// painting every commit gray.
 async function getCiStatusForCommit(owner, repo, sha) {
-  const ciData = await api.getCIStatus(owner, repo, sha);
+  let ciData;
+  try {
+    ciData = await api.getCIStatus(owner, repo, sha);
+  } catch (err) {
+    if (err && err.isRateLimit) throw err;
+    console.warn(`CI status unavailable for ${sha}, treating as unknown:`, err);
+    return "gray";
+  }
+  const runs = ciData["check_runs"] || [];
+  if (runs.length === 0) return "gray";
   let complete = true;
   let failed = false;
-  for (const checkRun of ciData["check_runs"]) {
+  for (const checkRun of runs) {
     if (["queued", "in_progress", "waiting", "requested", "pending"].includes(checkRun["status"])) {
       complete = false;
     }
@@ -389,27 +446,47 @@ async function getCiStatusForCommit(owner, repo, sha) {
 
 async function getCommits() {
   const [owner, repo] = getRepoInfo();
-  const commits = await api.getCommits(owner, repo);
+  if (!owner || !repo) {
+    throw new Error('Enter a repo as "owner/repo" (e.g. Acidicts/RepoWatch) before loading.');
+  }
+  // 10 list entries x (1 detail + 1 check-runs) + 1 list call = ~21 requests.
+  // The old default of 30 cost ~61 requests and blew the 60/hr anonymous
+  // quota on the very first click (surfaced as a bare 403).
+  const commits = await api.getCommits(owner, repo, 10);
   for (const commit_obj of commits) {
     const sha = commit_obj["sha"];
-    const commitData = await api.getCommit(owner, repo, sha);
+    let commitData;
+    try {
+      commitData = await api.getCommit(owner, repo, sha);
+    } catch (err) {
+      if (err && err.isRateLimit) throw err;
+      console.warn(`Skipping commit ${sha} (detail fetch failed):`, err);
+      continue;
+    }
     const files = commitData["files"] || [];
 
     // Fetch CI status while building the commit so it's created with the
     // correct status right away, instead of defaulting to "yellow".
-    const actionsStatus = await getCiStatusForCommit(owner, repo, sha);
+    // getCiStatusForCommit returns "gray" for repos without CI and only
+    // throws on rate limits.
+    let actionsStatus = "gray";
+    try {
+      actionsStatus = await getCiStatusForCommit(owner, repo, sha);
+    } catch (err) {
+      if (err && err.isRateLimit) throw err;
+    }
 
     const commit = createCommit(
       commitData["sha"],
       commitData["commit"]["message"],
       formatDate(commitData["commit"]["author"]["date"]),
       formatTime(commitData["commit"]["author"]["date"]),
-      commitData["stats"]["additions"],
-      commitData["stats"]["deletions"],
+      commitData["stats"]?.["additions"] ?? 0,
+      commitData["stats"]?.["deletions"] ?? 0,
       files.length,
       fileToLang(files),
       actionsStatus,
-      commitData["author"]["avatar_url"],
+      commitData["author"]?.["avatar_url"] ?? "",
       commitData["commit"]["author"]["name"],
       commitData["commit"]["url"]
     );
@@ -437,9 +514,16 @@ function clearCommits() {
 }
 
 async function updateCiData(commit) {
-  const [owner, repo] = getRepoInfo();
-  const status = await getCiStatusForCommit(owner, repo, commit.sha);
-  commitItems.find(c => c.sha === commit.sha).updateActionsStatus(status);
+  try {
+    const [owner, repo] = getRepoInfo();
+    if (!owner || !repo) return;
+    const status = await getCiStatusForCommit(owner, repo, commit.sha);
+    const item = commitItems.find(c => c.sha === commit.sha);
+    if (item) item.updateActionsStatus(status);
+  } catch (err) {
+    // Rate limit or network failure: keep the old dot, don't crash polling.
+    console.warn(`Could not refresh CI for ${commit.sha}:`, err);
+  }
 }
 
 async function updateAllCommits() {
@@ -482,6 +566,15 @@ function getCookie(name) {
   return null;
 }
 
+function deleteCookie(name) {
+  document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
+}
+
+function hasGithubKey() {
+  const el = document.getElementById("github_key");
+  return el && el.value.trim() !== "";
+}
+
 const focusedCommitContainer = document.getElementById("focused-commit");
 const focusedCommitTemplate = document.getElementById("focused-commit-template");
 const workflowStatusTemplate = document.getElementById("workflow-status");
@@ -502,13 +595,21 @@ function addWorkflow(name, value, workflowStatusContainer, url) {
 async function renderFocusedCommitWorkflows(commit, clone) {
   clone.querySelector(".focused-commit-workflows").innerHTML = '';
 
-  await commit.getActionsStatus();
+  try {
+    await commit.getActionsStatus();
+  } catch (err) {
+    // Rate-limited: leave the workflow list empty instead of breaking the
+    // whole focused-commit render.
+    console.warn(`Could not load workflows for ${commit.sha}:`, err);
+    return;
+  }
   for (const [name, value] of Object.entries(commit.actionStatuses)) {
     addWorkflow(name, value[0], clone.querySelector(".focused-commit-workflows"), value[1])
   }
 }
 
 async function renderFocusedCommit(commit) {
+  if (!commit) return;
   focusedCommitContainer.innerHTML = '';
   focusedCommit = commit.sha;
   const clone = document.importNode(focusedCommitTemplate.content, true);
@@ -535,18 +636,33 @@ async function renderFocusedCommit(commit) {
 }
 
 async function selectCommit(commit) {
+  if (!commit) return;
   await renderFocusedCommit(commit);
 }
 
 async function newCommitExists() {
+  // Nothing loaded yet (initial page view before the user presses Go):
+  // the Go handler owns the first load, so don't burn API quota here.
+  if (commitItems.length === 0) return;
   const [owner, repo] = getRepoInfo();
-  const commits = await api.getCommits(owner, repo);
+  if (!owner || !repo) return;
+  let commits;
+  try {
+    commits = await api.getCommits(owner, repo, 10);
+  } catch (err) {
+    // This was previously an unhandled rejection ("Uncaught (in promise)
+    // Error: HTTP error! Status: 403" at script.js:552). Log it and keep
+    // polling; the next tick retries.
+    console.warn("Background refresh: could not list commits:", err);
+    return;
+  }
   commits.sort((a, b) => new Date(b.commit.author.date) - new Date(a.commit.author.date));
 
   const latestDate = new Date(Math.max(...commitItems.map(c => new Date(c.date))));
 
   // For commits made after the latest commit in commitItems, create a new
   // Commit item and draw it.
+  let added = false;
   for (const commit_obj of commits) {
     const sha = commit_obj["sha"];
     if (commitItems.some(c => c.sha === sha)) continue;
@@ -554,29 +670,48 @@ async function newCommitExists() {
     const commitDate = new Date(commit_obj["commit"]["author"]["date"]);
     if (commitDate <= latestDate) break;
 
-    const commitData = await api.getCommit(owner, repo, sha);
+    let commitData;
+    try {
+      commitData = await api.getCommit(owner, repo, sha);
+    } catch (err) {
+      if (err && err.isRateLimit) {
+        console.warn("Background refresh stopped: rate limit exceeded:", err);
+        break;
+      }
+      console.warn(`Background refresh: skipping ${sha} (detail fetch failed):`, err);
+      continue;
+    }
     const files = commitData["files"] || [];
-    const actionsStatus = await getCiStatusForCommit(owner, repo, sha);
+    let actionsStatus = "gray";
+    try {
+      actionsStatus = await getCiStatusForCommit(owner, repo, sha);
+    } catch (err) {
+      if (err && err.isRateLimit) {
+        console.warn("Background refresh stopped: rate limit exceeded:", err);
+        break;
+      }
+    }
 
     const commit = createCommit(
       commitData["sha"],
       commitData["commit"]["message"],
       formatDate(commitData["commit"]["author"]["date"]),
       formatTime(commitData["commit"]["author"]["date"]),
-      commitData["stats"]["additions"],
-      commitData["stats"]["deletions"],
+      commitData["stats"]?.["additions"] ?? 0,
+      commitData["stats"]?.["deletions"] ?? 0,
       files.length,
       fileToLang(files),
       actionsStatus,
-      commitData["author"]["avatar_url"],
+      commitData["author"]?.["avatar_url"] ?? "",
       commitData["commit"]["author"]["name"],
       commitData["commit"]["url"]
     );
 
     addCommit(commit.sha, commit.title, commit.date, commit.linesAdded, commit.linesDeleted, commit.filesChanged, commit.languageBreakdown, commit.actionsStatus, commit.committerIconUrl, commit.usableUrl());
+    added = true;
   }
 
-  sortCommits();
+  if (added) sortCommits();
 }
 
 Array.from(document.getElementsByClassName("commit")).forEach(element => {
@@ -589,24 +724,40 @@ Array.from(document.getElementsByClassName("commit")).forEach(element => {
 document.getElementById("repo-input-button").addEventListener("click", async () => {
   clearCommits();
   setCookie("repo_input", document.getElementById("repo_input").value, 7);
+  const [owner, repo] = getRepoInfo();
+  const repoLabel = owner && repo ? `${owner}/${repo}` : document.getElementById("repo_input").value.trim();
   try {
-    await api.checkGithubKey();
+    if (!owner || !repo) {
+      throw new Error('Enter a repo as "owner/repo" (e.g. Acidicts/RepoWatch).');
+    }
+    if (hasGithubKey()) {
+      await api.checkGithubKey();
+    }
     await getCommits();
     sortCommits();
     // console.log('Finished drawing', commitItems.length);
   } catch (error) {
-    // console.error("Error fetching commits:", error);
-    alert("Error fetching commits. Please check the repository and your GitHub key.");
+    console.warn("Error fetching commits:", error);
+    alert(formatApiError(error, repoLabel || "(empty)"));
     const settingsModal = document.getElementById("settings-modal");
     settingsModal.showModal();
   }
 });
 
 document.getElementById("save-settings").addEventListener("click", async () => {
+  const key = document.getElementById("github_key").value.trim();
+  // Empty token = unauthenticated mode (60 req/hr). Clear any saved key
+  // and close without validating.
+  if (key === "") {
+    deleteCookie("github_key");
+    document.getElementById("settings-modal").close();
+    alert("No token saved — using unauthenticated mode (60 requests/hour). Add a token anytime to raise the limit.");
+    return;
+  }
   try {
     await api.checkGithubKey();
     document.getElementById("settings-modal").close();
-    setCookie("github_key", document.getElementById("github_key").value, 7);
+    setCookie("github_key", key, 7);
     alert("Success, the GitHub key is valid.");
   } catch (error) {
     console.error("Invalid GitHub key:", error);
@@ -617,6 +768,11 @@ document.getElementById("save-settings").addEventListener("click", async () => {
 document.getElementById("settings-button").addEventListener('click', () => {
   const settingsModal = document.getElementById("settings-modal");
   settingsModal.showModal();
+});
+
+document.querySelector(".settings-modal-close-button").addEventListener('click', () => {
+  const settingsModal = document.getElementById("settings-modal");
+  settingsModal.close();
 });
 
 document.getElementById("toggle-guide").addEventListener('click', () => {
@@ -642,10 +798,20 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 });
 
-function updatePage() {
-  newCommitExists();
+async function updatePage() {
+  try {
+    await newCommitExists();
+  } catch (err) {
+    console.warn("Background refresh failed:", err);
+  }
   if (focusedCommit != "") {
-    renderFocusedCommit(getCommitBySha(focusedCommit));
+    const commit = getCommitBySha(focusedCommit);
+    if (!commit) return;
+    try {
+      await renderFocusedCommit(commit);
+    } catch (err) {
+      console.warn("Could not re-render focused commit:", err);
+    }
   }
 }
 
