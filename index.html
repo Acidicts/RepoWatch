@@ -22,7 +22,7 @@
             <div class="commit-focused-workflow-status__name"></div>
         </div>
     </template>
-    
+
     <template id="commit-list-template">
         <div class="commit">
             <div class="commit-pi-chart">
@@ -30,7 +30,6 @@
                 <div class="commit-pi-chart-center">
                     <div class="commit-pi-chart-center-actions-status"></div>
                 </div>
-                <span class="commit-pi-chart-tooltip"></span>
             </div>
             <div class="commit-content">
                 <div class="commit-list-item-header">
@@ -62,7 +61,7 @@
                 </div>
                 <div class="focused-commit-header-text">
                     <div class="focused-commit-meta">
-                        <a class="focused-commit-meta-sha" target="_blank"  rel="noopener noreferrer"></a>
+                        <a class="focused-commit-meta-sha" target="_blank" rel="noopener noreferrer"></a>
                         <div class="focused-commit-meta-date"></div>
                     </div>
                     <div class="focused-committer">
@@ -78,7 +77,7 @@
                 <div class="focused-commit-files"></div>
             </div>
             <div class="focused-commit-workflows" id="focused-commit-workflows">
-            </div> 
+            </div>
             <div class="focused-commit-header-body">
                 <div class="focused-commit-text"></div>
             </div>
@@ -95,7 +94,9 @@
             <div class="pat-guide-steps">
                 <div class="pat-guide-step">
                     <span class="pat-guide-step-num">1</span>
-                    <span>Go to <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">GitHub Settings &rarr; Developer settings &rarr; Personal access tokens</a></span>
+                    <span>Go to <a href="https://github.com/settings/tokens" target="_blank"
+                            rel="noopener noreferrer">GitHub Settings &rarr; Developer settings &rarr; Personal access
+                            tokens</a></span>
                 </div>
                 <div class="pat-guide-step">
                     <span class="pat-guide-step-num">2</span>
@@ -107,7 +108,8 @@
                 </div>
                 <div class="pat-guide-step">
                     <span class="pat-guide-step-num">4</span>
-                    <span>Select for scope: <code>repo</code> (all (public + your private ones) repositories or just public)</span>
+                    <span>Select for scope: <code>repo</code> (all (public + your private ones) repositories or just
+                        public)</span>
                 </div>
                 <div class="pat-guide-step">
                     <span class="pat-guide-step-num">5</span>
@@ -115,7 +117,8 @@
                 </div>
                 <div class="pat-guide-step">
                     <span class="pat-guide-step-num">6</span>
-                    <span><strong>Write it down</strong> so you don't lose it like me and have to have it in the .env in development</span>
+                    <span><strong>Write it down</strong> so you don't lose it like me and have to have it in the .env in
+                        development</span>
                 </div>
             </div>
         </div>
@@ -141,7 +144,11 @@
 
     <main class="main">
         <div class="focused-commit" id="focused-commit"></div>
-        <div class="commit-list" id="commit-list"></div>
+        <div class="commit-list-section">
+            <h4>Click a Commit To View Details</h4>
+            <div class="line-gap"></div>
+            <div class="commit-list" id="commit-list"></div>
+        </div>
     </main>
 </body>
 <footer class="footer"></footer>

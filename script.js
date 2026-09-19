@@ -173,9 +173,40 @@ function makeConicGradient(data, options = {}) {
   return { gradient, segments, total };
 }
 
+// Single tooltip element portaled to <body>. Per-chart absolutely-positioned
+// tooltips get clipped by .commit-list's vertical scroll container (a
+// scroll/visible overflow combo computes to auto), producing horizontal
+// scrollbars instead of overlaying. A fixed-position body-level tooltip
+// always renders on top of parent divs.
+const globalChartTooltip = document.createElement('span');
+globalChartTooltip.className = 'commit-pi-chart-tooltip commit-pi-chart-tooltip--global';
+globalChartTooltip.setAttribute('role', 'tooltip');
+document.body.appendChild(globalChartTooltip);
+
+function placeGlobalTooltip(anchorEl) {
+  const rect = anchorEl.getBoundingClientRect();
+  globalChartTooltip.style.left = `${rect.left + rect.width / 2}px`;
+  globalChartTooltip.style.top = `${rect.top - 8}px`;
+}
+
+function showGlobalTooltip(label, anchorEl) {
+  globalChartTooltip.textContent = label;
+  globalChartTooltip.classList.add('is-visible');
+  placeGlobalTooltip(anchorEl);
+}
+
+function hideGlobalTooltip() {
+  globalChartTooltip.classList.remove('is-visible');
+}
+
+// Keep the tooltip glued to its chart while visible; otherwise hide it so a
+// stale tooltip never lingers after scrolling.
+window.addEventListener('scroll', hideGlobalTooltip, true);
+window.addEventListener('resize', hideGlobalTooltip);
+
 // Builds the invisible SVG ring of arcs used purely for hover/tooltip hit-testing,
-// and wires each segment up to show/hide a shared custom tooltip element.
-function buildHitLayer(svgEl, segments, total, tooltipEl) {
+// and wires each segment up to show/hide the portaled global tooltip element.
+function buildHitLayer(svgEl, segments, total) {
   const size = 34;         // matches viewBox / element size
   const radius = size / 2; // full radius so the stroke hit-area covers the visible ring
   const strokeWidth = size; // fat stroke = solid pie wedge coverage
@@ -189,6 +220,9 @@ function buildHitLayer(svgEl, segments, total, tooltipEl) {
   svgEl.innerHTML = '';
 
   const svgNS = 'http://www.w3.org/2000/svg';
+  // Anchor positioning to the chart box so the tooltip stays centered above
+  // it regardless of which segment is hovered.
+  const anchorEl = svgEl.closest('.commit-pi-chart, .focused-commit-pi-chart') || svgEl;
 
   segments.forEach(seg => {
     const fraction = (seg.endPct - seg.startPct) / 100;
@@ -213,13 +247,8 @@ function buildHitLayer(svgEl, segments, total, tooltipEl) {
     const pct = fraction * 100 <= 0 ? 0 : (seg.endPct - seg.startPct).toFixed(1);
     const label = `${toHumanString(seg.lang)} ${pct}%`;
 
-    const showTooltip = () => {
-      tooltipEl.textContent = label;
-      tooltipEl.classList.add('is-visible');
-    };
-    const hideTooltip = () => {
-      tooltipEl.classList.remove('is-visible');
-    };
+    const showTooltip = () => showGlobalTooltip(label, anchorEl);
+    const hideTooltip = () => hideGlobalTooltip();
 
     circle.addEventListener('mouseenter', showTooltip);
     circle.addEventListener('mouseleave', hideTooltip);
@@ -245,12 +274,7 @@ function renderPiChart(container, data, options = {}) {
   center.className = 'commit-pi-chart-center';
   chart.appendChild(center);
 
-  const tooltip = document.createElement('span');
-  tooltip.className = 'commit-pi-chart-tooltip';
-  tooltip.setAttribute('role', 'tooltip');
-  chart.appendChild(tooltip);
-
-  buildHitLayer(svg, segments, total, tooltip);
+  buildHitLayer(svg, segments, total);
 
   container.appendChild(chart);
   return chart;
@@ -277,12 +301,7 @@ function addCommit(sha, title, date, linesAdded, linesDeleted, filesChanged, lan
 
   chartEl.insertBefore(svg, chartEl.querySelector('.commit-pi-chart-center'));
 
-  const tooltip = document.createElement('span');
-  tooltip.className = 'commit-pi-chart-tooltip';
-  tooltip.setAttribute('role', 'tooltip');
-  chartEl.appendChild(tooltip);
-
-  buildHitLayer(svg, segments, total, tooltip);
+  buildHitLayer(svg, segments, total);
 
   const commitEl = clone.querySelector(".commit");
   commitEl.dataset.sha = sha;
@@ -499,11 +518,7 @@ async function renderFocusedCommit(commit) {
   chartEl.style.background = makeConicGradient(commit.languageBreakdown).gradient;
 
   const svg = clone.querySelector(".focused-commit-pi-chart-hitlayer");
-  const tooltip = document.createElement('span');
-  tooltip.className = 'commit-pi-chart-tooltip';
-  tooltip.setAttribute('role', 'tooltip');
-  chartEl.appendChild(tooltip);
-  buildHitLayer(svg, segments, total, tooltip);
+  buildHitLayer(svg, segments, total);
 
   clone.querySelector(".focused-commit-text").textContent = commit.title;
   clone.querySelector(".focused-committer-image").src = commit.committerIconUrl;

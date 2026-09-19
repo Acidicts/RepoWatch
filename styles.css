@@ -291,14 +291,39 @@ body {
     padding: 18px;
 }
 
-.main .commit-list {
+.main .commit-list-section {
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 18px;
+    overflow: visible;
+}
+
+.main .commit-list {
     scrollbar-width: thin;
-    overflow-x: auto;
-    overflow-y: scroll;
+    /* NOTE: overflow-x: visible + overflow-y: scroll is impossible per CSS
+       spec — the visible axis computes to auto and produces a horizontal
+       scrollbar / clips overflowing children (tooltips, hover growth).
+       Keep vertical scrolling here and portal overlays to <body> instead. */
+    overflow-x: hidden;
+    overflow-y: auto;
+    position: relative;
+    /* Reserve breathing room so the hover scale fits inside the scroll
+       container instead of overflowing it (which would either clip or, with
+       overflow-x: auto, produce a horizontal scrollbar). */
+    padding: 4px 10px 4px 4px;
+}
+
+.commit-list-section h4 {
+    margin-left: -6px;
+    margin-top: -0.25rem;
+}
+
+.commit-list-section .line-gap {
+    width: 100%;
+    border-bottom: 2px var(--primary-light) dashed;
+    margin-bottom: 8px;
+    opacity: 65%;
 }
 
 .commit-list .commit:nth-child(even) {
@@ -484,12 +509,16 @@ body {
     cursor: pointer;
     transition: all 0.15s;
     max-width: 100%;
+    position: relative;
+    transform-origin: center;
 }
 
 .commit:hover {
     background: var(--grey) !important;
     scale: 1.01;
     transform: translateX(1%);
+    /* Paint the grown row above its siblings while it overlaps them. */
+    z-index: 2;
 }
 
 .commit-pi-chart {
@@ -521,6 +550,11 @@ body {
     pointer-events: none;
 }
 
+.commit-pi-chart,
+.focused-commit-pi-chart {
+    overflow: visible;
+}
+
 .commit-pi-chart-tooltip {
     position: absolute;
     bottom: calc(100% + 8px);
@@ -547,6 +581,21 @@ body {
     opacity: 1;
     visibility: visible;
     transform: translateX(-50%) translateY(0);
+}
+
+/* Portaled tooltip: appended to <body> with position: fixed so it renders
+   on top of all scroll containers instead of being clipped / causing
+   overflow-x scroll inside .commit-list. */
+.commit-pi-chart-tooltip--global {
+    position: fixed;
+    /* left/top are set from JS (chart center, 8px above chart) */
+    bottom: auto;
+    transform: translate(-50%, -100%);
+    z-index: 9999;
+}
+
+.commit-pi-chart-tooltip--global.is-visible {
+    transform: translate(-50%, -100%);
 }
 
 .commit-pi-chart-center-actions-status {
