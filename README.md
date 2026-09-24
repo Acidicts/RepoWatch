@@ -31,5 +31,4 @@ and some other things which I can't think of right now
 - Live Server (VsCode Extension)
 
 # AI Declaration
-- Used for making [PLAN.md](PLAN.md)
 - Color scheme brainstorming ([theme.css](/theme.css))
